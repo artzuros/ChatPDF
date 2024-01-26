@@ -1,94 +1,99 @@
 import streamlit as st
 import os
 from PyPDF2 import PdfReader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-import google.generativeai as genai
-from langchain_community.vectorstores import FAISS
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.question_answering import load_qa_chain
-from langchain.prompts import PromptTemplate
+from langchain.chat_models import ChatOpenAI
+from langchain.llms import OpenAI
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.embeddings.huggingface import HuggingFaceEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
+from streamlit_chat import message
+from langchain.callbacks import get_openai_callback
 
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-def get_pdf_text(pdf_docs):
-    text=""
-    for pdf in pdf_docs:
-        pdf_reader= PdfReader(pdf)
-        for page in pdf_reader.pages:
-            text+= page.extract_text()
+def main():
+
+    openai_api_key = st.secrets['OPENAI_API_KEY']
+    st.set_page_config(page_title="Chat With files")
+    st.header("ChatPDF developed by :blue[PRANAV BANSAL]")
+
+    if "conversation" not in st.session_state:
+        st.session_state.conversation = None
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = None
+    if "processComplete" not in st.session_state:
+        st.session_state.processComplete = None
+
+        path = 'dataset/48lawsofpower.pdf'
+        files_text = get_pdf_text(path)
+        text_chunks = get_text_chunks(files_text)
+        vetorestore = get_vectorstore(text_chunks)
+     
+        st.session_state.conversation = get_conversation_chain(vetorestore, openai_api_key) 
+
+        st.session_state.processComplete = True
+
+    if  st.session_state.processComplete == True:
+        user_question = st.chat_input("Chat with file 48 LAWS OF POWER")
+        if user_question:
+            handel_userinput(user_question)
+
+def get_pdf_text(pdf):
+    pdf_reader = PdfReader(pdf)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text()
     return text
 
+def get_csv_text(file):
+    return "a"
+
 def get_text_chunks(text):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
+    text_splitter = CharacterTextSplitter(
+        separator="\n",
+        chunk_size=900,
+        chunk_overlap=100,
+        length_function=len
+    )
     chunks = text_splitter.split_text(text)
     return chunks
 
-def get_vector_store(text_chunks):
-    embeddings = GoogleGenerativeAIEmbeddings(model = "models/embedding-001")
-    vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
-    vector_store.save_local("vectorstore")
 
-def get_conversational_chain():
-    prompt_template = """ You are a helpful chatbot, talk to the user and
-    Answer the question as detailed as possible from the provided context, make sure to provide all the details, if the answer is not in
-    provided context just say, "answer is not available in the context" , don't provide the wrong answer\n\n
-    Context:\n {context}?\n
-    Question: \n{question}\n
+def get_vectorstore(text_chunks):
+    embeddings = HuggingFaceEmbeddings()
+    knowledge_base = FAISS.from_texts(text_chunks,embeddings)
+    return knowledge_base
 
-    Answer:
-    """
+def get_conversation_chain(vetorestore,openai_api_key):
+    llm = ChatOpenAI(openai_api_key=openai_api_key, model_name = 'gpt-3.5-turbo',temperature=0)
+    memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
+    conversation_chain = ConversationalRetrievalChain.from_llm(
+        llm=llm,
+        retriever=vetorestore.as_retriever(),
+        memory=memory
+    )
+    return conversation_chain
 
-    model = ChatGoogleGenerativeAI(model="gemini-pro",
-                             temperature=0.3)
+# This function takes a user question as input, sends it to a conversation model and displays the conversation history along with some additional information.
+def handel_userinput(user_question):
 
-    prompt = PromptTemplate(template = prompt_template, input_variables = ["context", "question"])
-    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
+    with get_openai_callback() as cb:
+        response = st.session_state.conversation({'question':user_question})
+    st.session_state.chat_history = response['chat_history']
 
-    return chain
+    response_container = st.container()
 
-chat_history = []
+    with response_container:
+        for i, messages in enumerate(st.session_state.chat_history):
+            if i % 2 == 0:
+                message(messages.content, is_user=True, key=str(i))
+            else:
+                message(messages.content, key=str(i))
+    #     st.write(f"Total Tokens: {cb.total_tokens}" f", Prompt Tokens: {cb.prompt_tokens}" f", Completion Tokens: {cb.completion_tokens}" f", Total Cost (USD): ${cb.total_cost}")
 
-def user_input(user_question):
-    embeddings = GoogleGenerativeAIEmbeddings(model = "models/embedding-001")
 
-    new_db = FAISS.load_local("vectorstore", embeddings)
-    docs = new_db.similarity_search(user_question)
 
-    chain = get_conversational_chain()
 
-    response = chain(
-        {"input_documents":docs, "question": user_question}
-        , return_only_outputs=True)
-
-    chat_history.append({"role": "user", "content": user_question})
-    chat_history.append({"role": "bot", "content": response['output_text']})
-
-    print(response)
-
-st.title('Betterzila Assignment by :blue[Pranav Bansal]')
-
-dataset_folder = "dataset/"
-if os.path.exists(dataset_folder):
-    for filename in os.listdir(dataset_folder):
-        file_path = os.path.join(dataset_folder, filename)
-        # Process each file in the folder
-        file_details = {"FileName": filename, "FilePath": file_path}
-        st.write(file_details)
-        raw_text = get_pdf_text([file_path])
-        text_chunks = get_text_chunks(raw_text)
-        get_vector_store(text_chunks)
-
-user_question = st.text_input("Enter your question here")
-if user_question:
-    user_input(user_question)
-else:
-    st.warning('Please enter a question.')
-
-for message in chat_history:
-    if message["role"] == "user":
-        st.markdown((":red[USER]"))
-        st.markdown((message["content"]))
-    else:
-        st.markdown((":green[BOT]"))
-        st.markdown((message["content"]))
+if __name__ == '__main__':
+    main()
