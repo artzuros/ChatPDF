@@ -1,7 +1,8 @@
 streamlit
+streamlit-chat
 PyPDF2
 langchain
-langchain_community
-langchain_google_genai
+langchain-community
 faiss-cpu
-google-generativeai
+sentence-transformers
+openai

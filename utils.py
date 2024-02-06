@@ -7,6 +7,8 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from streamlit_chat import message
 from langchain.callbacks import get_openai_callback
+import streamlit as st
+from streamlit_chat import message
 
 # Create Vector Store and Index
 def embed_all(DATASET = "dataset/", FAISS_INDEX = "vectorstore/"):
