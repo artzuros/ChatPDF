@@ -8,7 +8,7 @@ This repository is an assignment submission and also contains the code for a cha
 ## Installation
 1. Clone the repository
 ```
-git clone https://github.com/artzuros/betterzila-assignment.git
+git clone [https://github.com/artzuros/betterzila-assignment.git](https://github.com/artzuros/ChatPDF.git)
 ```
 2. Create a virtual environment
 ```
