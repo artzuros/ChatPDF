@@ -1,4 +1,4 @@
-# PDF-GPT
+# ChatGPT
 This repository contains the code for a chatbot using `Langchain` and powered by `OpenAI` using `Streamlit` for frontend UI.
 
 ## Table of Contents
