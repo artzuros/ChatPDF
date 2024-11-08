@@ -1,5 +1,5 @@
 # PDF-GPT
-This repository is an assignment submission and also contains the code for a chatbot using `Langchain` and powered by `OpenAI` using `Streamlit` for frontend UI.
+This repository contains the code for a chatbot using `Langchain` and powered by `OpenAI` using `Streamlit` for frontend UI.
 
 ## Table of Contents
 1. [Installation](#installation)
